@@ -765,15 +765,47 @@ let currentProfile = null;
 
 
 // ============================================================
-// AUTH STATE LISTENER
+// AUTH STATE LISTENER + INITIAL SESSION CHECK
+//
+// What's happening here:
+//   The problem was a race condition — when the page loads, the
+//   onAuthStateChange listener takes a moment to fire. During that
+//   gap the page was showing the login screen even though a valid
+//   saved session existed in localStorage.
+//
+//   The fix has two parts:
+//   1. We check for an existing session immediately on page load
+//      using getSession(). If one exists we show the app straight
+//      away without waiting for the listener to fire.
+//   2. The onAuthStateChange listener still runs for any subsequent
+//      changes (login, logout, token refresh) during the session.
 // ============================================================
-db.auth.onAuthStateChange(async (event, session) => {
+
+// Part 1: Check for existing session immediately on page load
+db.auth.getSession().then(async ({ data: { session } }) => {
   if (session?.user) {
     currentUser = session.user;
     await loadProfile();
     showApp();
     loadPickPage();
   } else {
+    showAuth();
+  }
+});
+
+// Part 2: Listen for any auth changes during the session
+db.auth.onAuthStateChange(async (event, session) => {
+  // SIGNED_IN fires when user logs in fresh
+  // TOKEN_REFRESHED fires when autoRefreshToken renews silently
+  // SIGNED_OUT fires when signOut() is called
+  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    if (session?.user && !currentUser) {
+      currentUser = session.user;
+      await loadProfile();
+      showApp();
+      loadPickPage();
+    }
+  } else if (event === 'SIGNED_OUT') {
     currentUser    = null;
     currentProfile = null;
     showAuth();
