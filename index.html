@@ -728,7 +728,37 @@
 // INIT SUPABASE
 // ============================================================
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ============================================================
+// SUPABASE CLIENT SETUP
+// We pass extra auth options here to fix a common problem where
+// users get logged out every time they close or refresh the page.
+//
+// What each option does:
+//   persistSession   — saves your login to the browser's localStorage
+//                      so it survives page refreshes and closing the tab
+//   storageKey       — gives our saved session a unique name ('lms-auth')
+//                      so it doesn't clash with other apps on the same domain
+//   storage          — tells Supabase to use the browser's built-in
+//                      localStorage (the default, but we set it explicitly
+//                      to make sure it's never skipped)
+//   autoRefreshToken — Supabase login sessions expire after 1 hour by default.
+//                      This automatically gets a fresh token behind the scenes
+//                      so the user stays logged in without noticing
+//   detectSessionInUrl — when Supabase redirects back to your app after
+//                        email confirmation, it puts the session info in the
+//                        URL. This option tells the client to look for it
+//                        there and pick it up automatically
+// ============================================================
+const db = createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession:    true,
+    storageKey:        'lms-auth',
+    storage:           window.localStorage,
+    autoRefreshToken:  true,
+    detectSessionInUrl: true,
+  }
+});
 
 let currentUser    = null;
 let currentProfile = null;
