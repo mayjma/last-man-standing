@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- iOS: prevent auto-zoom on input focus, fit to screen properly -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Last Man Standing — Premier League</title>
+
+  <!-- iOS Safari: "Add to Home Screen" support -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Last Man Standing" />
+
+  <!-- Browser tab colour (Chrome Android + Safari iOS) -->
+  <meta name="theme-color" content="#0a0e14" />
+
+  <!-- Prevent iOS Safari from auto-linking phone numbers / addresses -->
+  <meta name="format-detection" content="telephone=no, address=no, email=no" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+
+  <style>
+    /* ── RESET & BASE ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #00ff87;
+      --dark:    #0a0e14;
+      --card:    #111720;
+      --border:  #1e2a38;
+      --muted:   #4a5a6a;
+      --text:    #e8edf2;
+      --danger:  #ff4455;
+      --amber:   #ffb020;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%; /* prevent iOS Safari font scaling on rotation */
+    }
+
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      min-height: 100vh;
+      min-height: -webkit-fill-available; /* iOS Safari: true viewport height */
+      overflow-x: hidden;
+      /* respect iPhone notch & home bar */
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left:   env(safe-area-inset-left);
+      padding-right:  env(safe-area-inset-right);
+    }
+
+    /* iOS: remove blue tap flash on all interactive elements */
+    * { -webkit-tap-highlight-color: transparent; }
+
+    /* ── BACKGROUND TEXTURE ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,255,135,0.08) 0%, transparent 60%),
+        repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,0.012) 40px, rgba(255,255,255,0.012) 41px),
+        repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.012) 40px, rgba(255,255,255,0.012) 41px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── LAYOUT ── */
+    .wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 0 20px 60px; }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      padding: 48px 0 36px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 36px;
+    }
+
+    .logo-badge {
+      display: inline-block;
+      background: var(--green);
+      color: var(--dark);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 11px;
+      letter-spacing: 3px;
+      padding: 4px 12px;
+      border-radius: 2px;
+      margin-bottom: 16px;
+    }
+
+    header h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(48px, 10vw, 88px);
+      letter-spacing: 4px;
+      line-height: 0.92;
+      color: #fff;
+    }
+
+    header h1 span { color: var(--green); }
+
+    header p.tagline {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    /* ── NAV BAR ── */
+    nav {
+      display: flex;
+      gap: 4px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px;
+      margin-bottom: 32px;
+    }
+
+    nav button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      padding: 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s;
+      -webkit-appearance: none;
+      appearance: none;
+      touch-action: manipulation; /* remove 300ms iOS tap delay */
+    }
+
+    nav button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    nav button.active { background: var(--green); color: var(--dark); font-weight: 600; }
+
+    /* ── USER BAR ── */
+    .user-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      margin-bottom: 28px;
+      font-size: 13px;
+    }
+
+    .user-bar .name { font-weight: 600; color: var(--text); }
+    .user-bar .status-pill {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .status-pill.alive { background: rgba(0,255,135,0.15); color: var(--green); }
+    .status-pill.out   { background: rgba(255,68,85,0.15);  color: var(--danger); }
+
+    .btn-sm {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-sm:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 2px;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .card-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 20px;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── DEADLINE BANNER ── */
+    .deadline-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,176,32,0.08);
+      border: 1px solid rgba(255,176,32,0.25);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: var(--amber);
+    }
+
+    .deadline-banner .icon { font-size: 18px; }
+    .deadline-banner strong { font-weight: 600; }
+
+    /* ── FIXTURES LIST ── */
+    .fixture {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .fixture:last-child { border-bottom: none; }
+
+    .fixture .teams {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .fixture .teams .home { color: var(--text); }
+    .fixture .teams .vs   { color: var(--muted); font-size: 11px; margin: 0 6px; }
+    .fixture .teams .away { color: var(--text); }
+
+    .fixture .kickoff {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ── TEAM PICKER GRID ── */
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .team-btn {
+      position: relative;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px; /* bumped from 13px — more readable on iPhone */
+      font-weight: 500;
+      padding: 14px 12px;
+      cursor: pointer;
+      transition: all 0.18s;
+      text-align: left;
+      -webkit-appearance: none;
+      appearance: none;
+      touch-action: manipulation;
+      min-height: 48px; /* Apple HIG: minimum touch target size */
+    }
+
+    .team-btn:hover:not(:disabled) {
+      border-color: var(--green);
+      background: rgba(0,255,135,0.06);
+      color: #fff;
+    }
+
+    .team-btn.selected {
+      border-color: var(--green);
+      background: rgba(0,255,135,0.12);
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .team-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .team-btn .used-tag {
+      display: block;
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 3px;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── SUBMIT BTN ── */
+    .btn-primary {
+      display: block;
+      width: 100%;
+      background: var(--green);
+      color: var(--dark);
+      border: none;
+      border-radius: 8px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 2px;
+      padding: 16px;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: opacity 0.2s, transform 0.15s;
+      -webkit-appearance: none; /* iOS: remove default button styling */
+      appearance: none;
+      touch-action: manipulation; /* iOS: remove 300ms tap delay */
+    }
+
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:active:not(:disabled) { opacity: 0.85; transform: scale(0.98); } /* mobile tap feedback */
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── CURRENT PICK DISPLAY ── */
+    .current-pick-box {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0,255,135,0.06);
+      border: 1px solid rgba(0,255,135,0.2);
+      border-radius: 8px;
+      padding: 16px 18px;
+      margin-top: 16px;
+    }
+
+    .current-pick-box .tick { font-size: 24px; }
+    .current-pick-box .pick-info { flex: 1; }
+    .current-pick-box .pick-info strong { color: var(--green); font-size: 16px; }
+    .current-pick-box .pick-info p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ── LEADERBOARD TABLE ── */
+    .lb-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .lb-table th {
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: var(--muted);
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+    }
+
+    .lb-table td {
+      padding: 12px 12px;
+      border-bottom: 1px solid rgba(30,42,56,0.6);
+    }
+
+    .lb-table tr.eliminated td { opacity: 0.4; }
+
+    .lb-table .rank {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      color: var(--muted);
+    }
+
+    .lb-table .rank.top { color: var(--green); }
+
+    /* ── HISTORY TABLE ── */
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .history-table th {
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: var(--muted);
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+    }
+
+    .history-table td { padding: 10px 10px; border-bottom: 1px solid rgba(30,42,56,0.5); }
+
+    .outcome-badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .outcome-badge.win       { background: rgba(0,255,135,0.15); color: var(--green); }
+    .outcome-badge.loss      { background: rgba(255,68,85,0.15);  color: var(--danger); }
+    .outcome-badge.draw      { background: rgba(255,176,32,0.15); color: var(--amber); }
+    .outcome-badge.postponed { background: rgba(74,90,106,0.3);   color: var(--muted); }
+    .outcome-badge.pending   { background: rgba(74,90,106,0.2);   color: var(--muted); }
+
+    /* ── AUTH FORM ── */
+    .auth-wrap {
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .form-group { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px; /* MUST be 16px+ on iOS Safari to prevent auto-zoom on focus */
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none; /* remove iOS default styling (white bg, rounded corners) */
+      appearance: none;
+    }
+
+    input:focus { border-color: var(--green); }
+
+    .auth-switch {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .auth-switch a {
+      color: var(--green);
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    /* ── ALERTS ── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .alert.error   { background: rgba(255,68,85,0.1);  border: 1px solid rgba(255,68,85,0.3);  color: var(--danger); }
+    .alert.success { background: rgba(0,255,135,0.08); border: 1px solid rgba(0,255,135,0.25); color: var(--green); }
+    .alert.info    { background: rgba(74,90,106,0.2);  border: 1px solid var(--border);        color: var(--muted); }
+
+    /* ── LOADING ── */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-block {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--muted);
+    }
+    .empty .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty p { font-size: 14px; }
+
+    /* ── SECTION VISIBILITY ── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── RULES ── */
+    .rules-list { list-style: none; counter-reset: rules; }
+    .rules-list li {
+      counter-increment: rules;
+      display: flex;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .rules-list li:last-child { border-bottom: none; }
+    .rules-list li::before {
+      content: counter(rules);
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      background: var(--green);
+      color: var(--dark);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    /* ── RESPONSIVE: iOS / small screens ── */
+    @media (max-width: 520px) {
+      .team-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      nav button { font-size: 11px; padding: 8px 4px; letter-spacing: 0; }
+      .wrap { padding: 0 14px 80px; } /* extra bottom padding for iPhone home bar */
+      header { padding: 32px 0 24px; }
+      header h1 { font-size: 52px; }
+      .card { padding: 18px 16px; }
+      .user-bar { flex-wrap: wrap; gap: 8px; }
+
+      /* make tables horizontally scrollable on narrow screens */
+      .lb-table, .history-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+      }
+
+      /* larger touch targets for all buttons on mobile */
+      .btn-sm { padding: 8px 16px; }
+    }
+
+    /* iPhone SE / very small (320px) */
+    @media (max-width: 360px) {
+      .team-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+      .team-btn { font-size: 12px; padding: 12px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-badge">⚽ Premier League Edition</div>
+    <h1>Last Man<br/><span>Standing</span></h1>
+    <p class="tagline">Pick a winner every week. Don't repeat. Don't lose.</p>
+  </header>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- AUTH SECTION (shown when logged out)        -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="auth-section" style="display:none;">
+    <div class="auth-wrap">
+
+      <!-- LOGIN FORM -->
+      <div id="login-form" class="card">
+        <div class="card-title">Sign In</div>
+        <div class="card-sub">Enter the competition</div>
+        <div id="login-alert"></div>
+        <div class="form-group">
+          <label>EMAIL ADDRESS</label>
+          <input type="email" id="login-email" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+          <label>PASSWORD</label>
+          <input type="password" id="login-password" placeholder="••••••••" />
+        </div>
+        <button class="btn-primary" id="btn-login">SIGN IN</button>
+        <div class="auth-switch">Don't have an account? <a onclick="showRegister()">Register here</a></div>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div id="register-form" class="card" style="display:none;">
+        <div class="card-title">Register</div>
+        <div class="card-sub">Create your account to enter</div>
+        <div id="register-alert"></div>
+        <div class="form-group">
+          <label>YOUR NAME</label>
+          <input type="text" id="reg-name" placeholder="John Smith" />
+        </div>
+        <div class="form-group">
+          <label>EMAIL ADDRESS</label>
+          <input type="email" id="reg-email" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+          <label>PASSWORD</label>
+          <input type="password" id="reg-password" placeholder="Min 6 characters" />
+        </div>
+        <button class="btn-primary" id="btn-register">CREATE ACCOUNT</button>
+        <div class="auth-switch">Already registered? <a onclick="showLogin()">Sign in</a></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MAIN APP (shown when logged in)             -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="app-section" style="display:none;">
+
+    <!-- User bar -->
+    <div class="user-bar">
+      <div>
+        <div class="name" id="user-name">Loading...</div>
+        <div style="font-size:12px; color:var(--muted); margin-top:2px;" id="user-email"></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="status-pill alive" id="status-pill">● ALIVE</span>
+        <button class="btn-sm" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+      <button class="active" onclick="showPage('pick', this)">📌 My Pick</button>
+      <button onclick="showPage('leaderboard', this)">🏆 Leaderboard</button>
+      <button onclick="showPage('history', this)">📋 My History</button>
+      <button onclick="showPage('rules', this)">📖 Rules</button>
+      <button id="admin-nav-btn" onclick="showPage('admin', this)" style="display:none;">⚙️ Admin</button>
+    </nav>
+
+    <!-- ── PAGE: MY PICK ── -->
+    <div id="page-pick" class="page active">
+      <div id="pick-content">
+        <div class="loading-block"><span class="spinner"></span> Loading gameweek...</div>
+      </div>
+    </div>
+
+    <!-- ── PAGE: LEADERBOARD ── -->
+    <div id="page-leaderboard" class="page">
+      <div class="card">
+        <div class="card-title">Leaderboard</div>
+        <div class="card-sub">Who's still standing</div>
+        <div id="leaderboard-content">
+          <div class="loading-block"><span class="spinner"></span> Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PAGE: MY HISTORY ── -->
+    <div id="page-history" class="page">
+      <div class="card">
+        <div class="card-title">My Pick History</div>
+        <div class="card-sub">All your selections this season</div>
+        <div id="history-content">
+          <div class="loading-block"><span class="spinner"></span> Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PAGE: RULES ── -->
+    <div id="page-rules" class="page">
+      <div class="card">
+        <div class="card-title">Competition Rules</div>
+        <div class="card-sub">Read carefully — no exceptions</div>
+        <ul class="rules-list">
+          <li>Each week all entrants must pick a Premier League team to win their game. The fixtures will be sent out by the administrator.</li>
+          <li>If your team wins, you're through to the next round. Lose or draw, and you are out of the competition.</li>
+          <li>You must notify the organiser by the stated deadline of your selection. If you do not select a team by the deadline you will be eliminated. <strong>THERE ARE NO EXCEPTIONS.</strong></li>
+          <li>You cannot select the same team to win more than once during the competition.</li>
+          <li>Once you have chosen a team, you cannot change it.</li>
+          <li>If a match involving your selection is postponed (after you have made your selection), you will continue to the next round. However, that team will no longer be available for you to pick in the following rounds.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── PAGE: ADMIN ── -->
+    <div id="page-admin" class="page">
+      <div class="card">
+        <div class="card-title">⚙️ Admin Panel</div>
+        <div class="card-sub">Sync fixtures &amp; results from football-data.org</div>
+
+        <div class="alert info" style="margin-bottom:20px;">
+          One button syncs everything — fixtures, results, pick outcomes, and eliminations.
+          Run it to set up a new week, and again after matches finish to process results.
+        </div>
+
+        <div class="form-group">
+          <label>MATCHWEEK NUMBER</label>
+          <input type="number" id="sync-matchday" placeholder="e.g. 28" min="1" max="38"
+            style="width:160px;" />
+        </div>
+
+        <button class="btn-primary" id="btn-sync" onclick="syncGameweek()" style="margin-top:12px;">
+          🔄 SYNC MATCHWEEK
+        </button>
+
+        <div id="sync-result" style="margin-top:16px;"></div>
+      </div>
+
+      <div class="card" style="margin-top:0;">
+        <div class="card-title" style="font-size:17px;">How it works</div>
+        <div style="font-size:13px; color:var(--muted); line-height:1.8;">
+          <p style="margin-bottom:8px;">📥 <strong style="color:var(--text);">Before the week:</strong> Enter the matchweek number and sync — fixtures and deadline are imported automatically.</p>
+          <p style="margin-bottom:8px;">⏰ <strong style="color:var(--text);">Deadline:</strong> Auto-set to 1 hour before the first kickoff of that matchweek.</p>
+          <p style="margin-bottom:8px;">✅ <strong style="color:var(--text);">After matches:</strong> Sync again — results are fetched, picks are marked win/loss/draw, players are eliminated automatically.</p>
+          <p>🔁 <strong style="color:var(--text);">Mid-week:</strong> Safe to sync multiple times — it only updates what has changed.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /app-section -->
+
+</div><!-- /wrap -->
+
+
+<script>
+// ============================================================
+// INIT SUPABASE
+// ============================================================
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser    = null;
+let currentProfile = null;
+
+
+// ============================================================
+// AUTH STATE LISTENER
+// ============================================================
+db.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+    await loadProfile();
+    showApp();
+    loadPickPage();
+  } else {
+    currentUser    = null;
+    currentProfile = null;
+    showAuth();
+  }
+});
+
+
+// ============================================================
+// SHOW / HIDE AUTH vs APP
+// ============================================================
+function showAuth() {
+  document.getElementById('auth-section').style.display = 'block';
+  document.getElementById('app-section').style.display  = 'none';
+}
+
+function showApp() {
+  document.getElementById('auth-section').style.display = 'none';
+  document.getElementById('app-section').style.display  = 'block';
+}
+
+function showLogin() {
+  document.getElementById('login-form').style.display    = 'block';
+  document.getElementById('register-form').style.display = 'none';
+}
+
+function showRegister() {
+  document.getElementById('login-form').style.display    = 'none';
+  document.getElementById('register-form').style.display = 'block';
+}
+
+
+// ============================================================
+// PROFILE
+// ============================================================
+async function loadProfile() {
+  const { data } = await db
+    .from('profiles')
+    .select('*')
+    .eq('id', currentUser.id)
+    .single();
+
+  currentProfile = data;
+
+  if (data) {
+    document.getElementById('user-name').textContent  = data.full_name;
+    document.getElementById('user-email').textContent = data.email;
+
+    const pill = document.getElementById('status-pill');
+    if (data.is_active) {
+      pill.textContent = '● ALIVE';
+      pill.className   = 'status-pill alive';
+    } else {
+      pill.textContent = '✕ ELIMINATED';
+      pill.className   = 'status-pill out';
+    }
+
+    // Show admin tab only for admin users
+    if (data.is_admin) {
+      document.getElementById('admin-nav-btn').style.display = 'flex';
+    }
+  }
+}
+
+
+// ============================================================
+// AUTH: LOGIN
+// ============================================================
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const alertEl  = document.getElementById('login-alert');
+
+  if (!email || !password) {
+    alertEl.innerHTML = '<div class="alert error">Please fill in all fields.</div>';
+    return;
+  }
+
+  alertEl.innerHTML = '<div class="alert info"><span class="spinner"></span> Signing in...</div>';
+
+  const { error } = await db.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    alertEl.innerHTML = `<div class="alert error">${error.message}</div>`;
+  }
+});
+
+
+// ============================================================
+// AUTH: REGISTER
+// ============================================================
+document.getElementById('btn-register').addEventListener('click', async () => {
+  const name     = document.getElementById('reg-name').value.trim();
+  const email    = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const alertEl  = document.getElementById('register-alert');
+
+  if (!name || !email || !password) {
+    alertEl.innerHTML = '<div class="alert error">Please fill in all fields.</div>';
+    return;
+  }
+  if (password.length < 6) {
+    alertEl.innerHTML = '<div class="alert error">Password must be at least 6 characters.</div>';
+    return;
+  }
+
+  alertEl.innerHTML = '<div class="alert info"><span class="spinner"></span> Creating account...</div>';
+
+  const { error } = await db.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: name } }
+  });
+
+  if (error) {
+    alertEl.innerHTML = `<div class="alert error">${error.message}</div>`;
+  } else {
+    alertEl.innerHTML = '<div class="alert success">Account created! Check your email to confirm, then sign in.</div>';
+  }
+});
+
+
+// ============================================================
+// SIGN OUT
+// ============================================================
+async function signOut() {
+  await db.auth.signOut();
+}
+
+
+// ============================================================
+// NAV: SWITCH PAGES
+// ============================================================
+function showPage(page, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+
+  document.getElementById(`page-${page}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  if (page === 'leaderboard') loadLeaderboard();
+  if (page === 'history')     loadHistory();
+}
+
+
+// ============================================================
+// PICK PAGE — main logic
+// ============================================================
+async function loadPickPage() {
+  const el = document.getElementById('pick-content');
+  el.innerHTML = '<div class="loading-block"><span class="spinner"></span> Loading gameweek...</div>';
+
+  // Is player eliminated?
+  if (currentProfile && !currentProfile.is_active) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="color:var(--danger)">Eliminated</div>
+        <div class="card-sub">Your run has ended. Better luck next season.</div>
+        <div class="alert error" style="margin-top:8px;">You have been eliminated from this competition.</div>
+      </div>`;
+    return;
+  }
+
+  // Get current open gameweek
+  const { data: gw, error: gwErr } = await db
+    .from('gameweeks')
+    .select('*')
+    .eq('is_open', true)
+    .order('week_number', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (gwErr || !gw) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-title">No Active Gameweek</div>
+        <div class="card-sub">The administrator hasn't opened a gameweek yet.</div>
+        <div class="empty"><div class="icon">⏳</div><p>Check back soon — picking will open before the next deadline.</p></div>
+      </div>`;
+    return;
+  }
+
+  // Check if player already has a pick this week
+  const { data: existingPick } = await db
+    .from('picks')
+    .select('*, pl_teams(name)')
+    .eq('player_id', currentUser.id)
+    .eq('gameweek_id', gw.id)
+    .maybeSingle();
+
+  // Get player's previously used teams
+  const { data: usedPicks } = await db
+    .from('picks')
+    .select('team_id')
+    .eq('player_id', currentUser.id);
+
+  const usedTeamIds = new Set((usedPicks || []).map(p => p.team_id));
+
+  // Get fixtures for this gameweek
+  const { data: fixtures } = await db
+    .from('fixtures')
+    .select('*, home:pl_teams!fixtures_home_team_id_fkey(id, name), away:pl_teams!fixtures_away_team_id_fkey(id, name)')
+    .eq('gameweek_id', gw.id)
+    .order('kickoff_time');
+
+  // Get available teams from these fixtures (not postponed)
+  const availableTeams = [];
+  (fixtures || []).forEach(f => {
+    if (!f.is_postponed) {
+      availableTeams.push({ id: f.home.id, name: f.home.name });
+      availableTeams.push({ id: f.away.id, name: f.away.name });
+    }
+  });
+
+  // Deadline display
+  const deadline     = new Date(gw.deadline);
+  const deadlineStr  = deadline.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+                     + ' at ' + deadline.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const isPastDeadline = new Date() > deadline;
+
+  let html = `
+    <div class="card">
+      <div class="card-title">Gameweek ${gw.week_number}</div>
+      <div class="card-sub">${gw.notes || ''}</div>
+
+      <div class="deadline-banner">
+        <span class="icon">⏰</span>
+        <div>
+          ${isPastDeadline
+            ? '<strong>DEADLINE PASSED</strong> — picking is now closed for this week.'
+            : `<strong>Pick deadline:</strong> ${deadlineStr}`}
+        </div>
+      </div>`;
+
+  // Show fixtures
+  if (fixtures && fixtures.length > 0) {
+    html += `<div style="margin-bottom:20px;">
+      <div style="font-size:11px; letter-spacing:1px; color:var(--muted); margin-bottom:10px;">THIS WEEK'S FIXTURES</div>`;
+    fixtures.forEach(f => {
+      const ko = f.kickoff_time
+        ? new Date(f.kickoff_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+          + ' ' + new Date(f.kickoff_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        : 'TBC';
+      html += `
+        <div class="fixture">
+          <div class="teams">
+            <span class="home">${f.home.name}</span>
+            <span class="vs">vs</span>
+            <span class="away">${f.away.name}</span>
+            ${f.is_postponed ? '<span style="font-size:11px; color:var(--danger); margin-left:6px;">POSTPONED</span>' : ''}
+          </div>
+          <div class="kickoff">${ko}</div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // If player already picked
+  if (existingPick) {
+    html += `
+      <div style="font-size:11px; letter-spacing:1px; color:var(--muted); margin-bottom:4px;">YOUR PICK THIS WEEK</div>
+      <div class="current-pick-box">
+        <div class="tick">✅</div>
+        <div class="pick-info">
+          <strong>${existingPick.pl_teams.name}</strong>
+          <p>Submitted ${new Date(existingPick.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — you cannot change this pick (Rule 5)</p>
+        </div>
+      </div>`;
+  } else if (isPastDeadline) {
+    html += `<div class="alert error">The deadline has passed. You have not made a pick this week and will be eliminated.</div>`;
+  } else {
+    // Show team picker
+    html += `
+      <div style="font-size:11px; letter-spacing:1px; color:var(--muted); margin-bottom:2px;">SELECT YOUR TEAM</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Greyed out = already used this season</div>
+      <div class="team-grid" id="team-grid">`;
+
+    availableTeams.forEach(team => {
+      const alreadyUsed = usedTeamIds.has(team.id);
+      html += `
+        <button
+          class="team-btn${alreadyUsed ? '' : ''}"
+          data-id="${team.id}"
+          data-name="${team.name}"
+          ${alreadyUsed ? 'disabled' : ''}
+          onclick="selectTeam(this)"
+        >
+          ${team.name}
+          ${alreadyUsed ? '<span class="used-tag">Already used</span>' : ''}
+        </button>`;
+    });
+
+    html += `</div>
+      <button class="btn-primary" id="btn-submit" disabled onclick="submitPick(${gw.id})">
+        CONFIRM PICK
+      </button>`;
+  }
+
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// ============================================================
+// ADMIN: SYNC GAMEWEEK
+// ============================================================
+async function syncGameweek() {
+  const matchday = parseInt(document.getElementById('sync-matchday').value);
+  const resultEl = document.getElementById('sync-result');
+  const btn      = document.getElementById('btn-sync');
+
+  if (!matchday || matchday < 1 || matchday > 38) {
+    resultEl.innerHTML = '<div class="alert error">Please enter a valid matchweek (1–38).</div>';
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Syncing...';
+  resultEl.innerHTML = '<div class="alert info"><span class="spinner"></span> Fetching from football-data.org...</div>';
+
+  try {
+    const { data, error } = await db.functions.invoke('sync-gameweek', {
+      body: { matchday }
+    });
+
+    if (error) throw error;
+
+    if (data.success) {
+      resultEl.innerHTML = `
+        <div class="alert success">
+          <strong>✅ Sync complete — Matchweek ${matchday}</strong><br/>
+          <span style="font-size:12px; opacity:0.85; line-height:2;">
+            Fixtures: ${data.fixtures_upserted} &nbsp;|&nbsp;
+            Results updated: ${data.results_updated} &nbsp;|&nbsp;
+            Picks processed: ${data.picks_processed}<br/>
+            Players eliminated: ${data.players_eliminated} &nbsp;|&nbsp;
+            Missed deadline: ${data.missed_deadline_removed} &nbsp;|&nbsp;
+            Week complete: ${data.gameweek_complete ? 'Yes ✓' : 'Not yet'}
+          </span>
+        </div>`;
+    } else {
+      throw new Error(data.error || 'Unknown error from sync function');
+    }
+  } catch (err) {
+    resultEl.innerHTML = `<div class="alert error">❌ Sync failed: ${err.message}</div>`;
+  }
+
+  btn.disabled    = false;
+  btn.textContent = '🔄 SYNC MATCHWEEK';
+}
+
+
+let selectedTeamId   = null;
+let selectedTeamName = null;
+
+function selectTeam(btn) {
+  document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedTeamId   = parseInt(btn.dataset.id);
+  selectedTeamName = btn.dataset.name;
+  document.getElementById('btn-submit').disabled = false;
+  document.getElementById('btn-submit').textContent = `CONFIRM: ${selectedTeamName}`;
+}
+
+async function submitPick(gameweekId) {
+  if (!selectedTeamId) return;
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled    = true;
+  btn.textContent = 'Submitting...';
+
+  const { error } = await db.from('picks').insert({
+    player_id:   currentUser.id,
+    gameweek_id: gameweekId,
+    team_id:     selectedTeamId
+  });
+
+  if (error) {
+    btn.disabled    = false;
+    btn.textContent = `CONFIRM: ${selectedTeamName}`;
+    alert('Error submitting pick: ' + error.message);
+  } else {
+    // Reload the pick page to show confirmation
+    loadPickPage();
+  }
+}
+
+
+// ============================================================
+// LEADERBOARD
+// ============================================================
+async function loadLeaderboard() {
+  const el = document.getElementById('leaderboard-content');
+  el.innerHTML = '<div class="loading-block"><span class="spinner"></span> Loading...</div>';
+
+  const { data, error } = await db
+    .from('leaderboard')
+    .select('*');
+
+  if (error || !data || data.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">🏆</div><p>No players yet.</p></div>';
+    return;
+  }
+
+  let html = `
+    <table class="lb-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Status</th>
+          <th>Wins</th>
+          <th>Rounds</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  data.forEach((player, i) => {
+    const isMe = player.id === currentUser?.id;
+    html += `
+      <tr class="${player.is_active ? '' : 'eliminated'}" style="${isMe ? 'background: rgba(0,255,135,0.04);' : ''}">
+        <td class="rank ${i < 3 && player.is_active ? 'top' : ''}">${i + 1}</td>
+        <td>${player.full_name}${isMe ? ' <span style="font-size:10px;color:var(--green);">(You)</span>' : ''}</td>
+        <td>
+          <span class="status-pill ${player.is_active ? 'alive' : 'out'}">
+            ${player.is_active ? '● Alive' : '✕ Out'}
+          </span>
+        </td>
+        <td>${player.wins}</td>
+        <td>${player.total_picks}</td>
+      </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  el.innerHTML = html;
+}
+
+
+// ============================================================
+// MY PICK HISTORY
+// ============================================================
+async function loadHistory() {
+  const el = document.getElementById('history-content');
+  el.innerHTML = '<div class="loading-block"><span class="spinner"></span> Loading...</div>';
+
+  const { data, error } = await db
+    .from('pick_history')
+    .select('*')
+    .eq('player_id', currentUser.id)
+    .order('week_number', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">📋</div><p>No picks yet this season.</p></div>';
+    return;
+  }
+
+  let html = `
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Week</th>
+          <th>Team Picked</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  data.forEach(pick => {
+    html += `
+      <tr>
+        <td>GW${pick.week_number}</td>
+        <td>${pick.team_name}</td>
+        <td><span class="outcome-badge ${pick.outcome}">${pick.outcome}</span></td>
+      </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  el.innerHTML = html;
+}
+</script>
+
+</body>
+</html>
