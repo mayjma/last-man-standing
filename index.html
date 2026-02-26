@@ -897,9 +897,18 @@ document.getElementById('btn-register').addEventListener('click', async () => {
 
 // ============================================================
 // SIGN OUT
+// What's happening here:
+//   1. We tell Supabase to sign out (clears the session on their server)
+//   2. We manually clear our localStorage key so no stale data remains
+//   3. We reload the page cleanly — this is the simplest and most reliable
+//      way to reset all the app state back to the logged-out view.
+//      Without the reload, the app can get stuck in a halfway state where
+//      Supabase knows you're logged out but the page still shows your data.
 // ============================================================
 async function signOut() {
   await db.auth.signOut();
+  localStorage.removeItem('lms-auth');
+  window.location.reload();
 }
 
 
