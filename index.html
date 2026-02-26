@@ -792,13 +792,22 @@ let currentProfile = null;
 // ============================================================
 
 // Part 1: Check for existing session immediately on page load
-db.auth.getSession().then(async ({ data: { session } }) => {
+db.auth.getSession().then(async ({ data: { session }, error }) => {
+  console.log('getSession fired', { session: !!session, error });
   if (session?.user) {
+    console.log('Session found, loading profile...');
     currentUser = session.user;
-    await loadProfile();
-    showApp();
-    loadPickPage();
+    try {
+      await loadProfile();
+      console.log('Profile loaded, showing app...');
+      showApp();
+      loadPickPage();
+    } catch(e) {
+      console.error('Error loading profile:', e);
+      showAuth();
+    }
   } else {
+    console.log('No session found, showing auth...');
     showAuth();
   }
 });
