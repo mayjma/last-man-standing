@@ -566,6 +566,16 @@
   </header>
 
   <!-- ═══════════════════════════════════════════ -->
+  <!-- LOADING SCREEN (shown while checking session) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="loading-section" style="display:block;">
+    <div style="text-align:center; padding:60px 20px; color:var(--muted);">
+      <div class="spinner" style="width:32px; height:32px; border-width:3px; margin: 0 auto 16px;"></div>
+      <p style="font-size:14px;">Loading...</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
   <!-- AUTH SECTION (shown when logged out)        -->
   <!-- ═══════════════════════════════════════════ -->
   <div id="auth-section" style="display:none;">
@@ -817,13 +827,15 @@ db.auth.onAuthStateChange(async (event, session) => {
 // SHOW / HIDE AUTH vs APP
 // ============================================================
 function showAuth() {
-  document.getElementById('auth-section').style.display = 'block';
-  document.getElementById('app-section').style.display  = 'none';
+  document.getElementById('loading-section').style.display = 'none';
+  document.getElementById('auth-section').style.display    = 'block';
+  document.getElementById('app-section').style.display     = 'none';
 }
 
 function showApp() {
-  document.getElementById('auth-section').style.display = 'none';
-  document.getElementById('app-section').style.display  = 'block';
+  document.getElementById('loading-section').style.display = 'none';
+  document.getElementById('auth-section').style.display    = 'none';
+  document.getElementById('app-section').style.display     = 'block';
 }
 
 function showLogin() {
