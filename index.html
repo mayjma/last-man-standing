@@ -19,7 +19,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <script src="supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
 
   <style>
@@ -791,39 +791,58 @@ let currentProfile = null;
 //      changes (login, logout, token refresh) during the session.
 // ============================================================
 
-// Part 1: Check for existing session immediately on page load
-db.auth.getSession().then(async ({ data: { session }, error }) => {
-  console.log('getSession fired', { session: !!session, error });
-  if (session?.user) {
-    console.log('Session found, loading profile...');
-    currentUser = session.user;
-    try {
-      await loadProfile();
-      console.log('Profile loaded, showing app...');
-      showApp();
-      loadPickPage();
-    } catch(e) {
-      console.error('Error loading profile:', e);
-      showAuth();
-    }
-  } else {
-    console.log('No session found, showing auth...');
-    showAuth();
-  }
-});
+// ============================================================
+// SESSION RESTORE
+//
+// What's happening here:
+//   Instead of using Supabase's async getSession() call (which
+//   was hanging indefinitely in some browsers), we read the saved
+//   session directly from localStorage ourselves. This is instant
+//   and synchronous — no waiting, no hanging.
+//
+//   We then use onAuthStateChange to handle all ongoing auth events
+//   like fresh logins, token refreshes and sign outs.
+// ============================================================
 
-// Part 2: Listen for any auth changes during the session
-db.auth.onAuthStateChange(async (event, session) => {
-  // SIGNED_IN fires when user logs in fresh
-  // TOKEN_REFRESHED fires when autoRefreshToken renews silently
-  // SIGNED_OUT fires when signOut() is called
-  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-    if (session?.user && !currentUser) {
-      currentUser = session.user;
-      await loadProfile();
-      showApp();
-      loadPickPage();
+// Read session directly from localStorage — instant, no async needed
+function restoreSession() {
+  try {
+    const raw = localStorage.getItem('lms-auth');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Check token hasn't expired
+    const expiresAt = parsed?.expires_at;
+    if (expiresAt && Date.now() / 1000 > expiresAt) {
+      console.log('Token expired, clearing session');
+      localStorage.removeItem('lms-auth');
+      return null;
     }
+    return parsed?.user ?? null;
+  } catch(e) {
+    console.error('Error reading session:', e);
+    return null;
+  }
+}
+
+// Try to restore session immediately on page load
+const savedUser = restoreSession();
+if (savedUser) {
+  currentUser = savedUser;
+  loadProfile().then(() => {
+    showApp();
+    loadPickPage();
+  }).catch(() => showAuth());
+} else {
+  showAuth();
+}
+
+// Listen for ongoing auth changes (login, logout, token refresh)
+db.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN') {
+    currentUser = session.user;
+    await loadProfile();
+    showApp();
+    loadPickPage();
   } else if (event === 'SIGNED_OUT') {
     currentUser    = null;
     currentProfile = null;
