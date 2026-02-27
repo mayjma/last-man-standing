@@ -892,33 +892,53 @@ function showRegister() {
 
 // ============================================================
 // PROFILE
+// We use a direct fetch call here instead of the Supabase JS
+// client (db.from(...)) because the JS client can hang on
+// session restore before it is fully initialised. Direct fetch
+// calls to the Supabase REST API always work immediately.
 // ============================================================
 async function loadProfile() {
-  const { data } = await db
-    .from('profiles')
-    .select('*')
-    .eq('id', currentUser.id)
-    .single();
+  try {
+    // Get the access token from our saved session
+    const raw     = localStorage.getItem('lms-auth');
+    const session = raw ? JSON.parse(raw) : null;
+    const token   = session?.access_token || session?.token || SUPABASE_ANON;
 
-  currentProfile = data;
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=*`,
+      {
+        headers: {
+          'apikey':        SUPABASE_ANON,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type':  'application/json',
+        }
+      }
+    );
 
-  if (data) {
-    document.getElementById('user-name').textContent  = data.full_name;
-    document.getElementById('user-email').textContent = data.email;
+    const rows = await res.json();
+    const data = rows?.[0] || null;
+    currentProfile = data;
 
-    const pill = document.getElementById('status-pill');
-    if (data.is_active) {
-      pill.textContent = '● ALIVE';
-      pill.className   = 'status-pill alive';
-    } else {
-      pill.textContent = '✕ ELIMINATED';
-      pill.className   = 'status-pill out';
+    if (data) {
+      document.getElementById('user-name').textContent  = data.full_name;
+      document.getElementById('user-email').textContent = data.email;
+
+      const pill = document.getElementById('status-pill');
+      if (data.is_active) {
+        pill.textContent = '● ALIVE';
+        pill.className   = 'status-pill alive';
+      } else {
+        pill.textContent = '✕ ELIMINATED';
+        pill.className   = 'status-pill out';
+      }
+
+      // Show admin tab only for admin users
+      if (data.is_admin) {
+        document.getElementById('admin-nav-btn').style.display = 'flex';
+      }
     }
-
-    // Show admin tab only for admin users
-    if (data.is_admin) {
-      document.getElementById('admin-nav-btn').style.display = 'flex';
-    }
+  } catch(e) {
+    console.error('loadProfile error:', e);
   }
 }
 
