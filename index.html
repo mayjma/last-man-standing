@@ -19,7 +19,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <script src="supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
 
   <style>
@@ -824,14 +824,27 @@ function restoreSession() {
   }
 }
 
-// Try to restore session immediately on page load
+// Try to restore session on page load
+// We use a short timeout to ensure the Supabase client is fully
+// initialised before we try to make any database calls with it.
+// Without this, the client can exist as an object but not yet be
+// ready to accept requests, causing calls to hang indefinitely.
 const savedUser = restoreSession();
 if (savedUser) {
   currentUser = savedUser;
-  loadProfile().then(() => {
-    showApp();
-    loadPickPage();
-  }).catch(() => showAuth());
+  // Show app shell immediately so user sees content not a spinner
+  showApp();
+  // Then load profile data once Supabase client is ready
+  setTimeout(async () => {
+    try {
+      await loadProfile();
+      loadPickPage();
+    } catch(e) {
+      console.error('Profile load failed:', e);
+      // If profile fails, still show the pick page with basic data
+      loadPickPage();
+    }
+  }, 100);
 } else {
   showAuth();
 }
